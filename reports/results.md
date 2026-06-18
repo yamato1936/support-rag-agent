@@ -758,3 +758,68 @@ Current API test result:
 - tests passed: 11
 - warning: 1 Starlette/httpx deprecation warning
 
+
+---
+
+## 16. v3: Grounded Answer Endpoint
+
+The project now includes a citation-grounded `/answer` endpoint.
+
+Purpose:
+
+- retrieve relevant support documents
+- generate an answer using only retrieved documents
+- return citations
+- avoid over-trusting only the rank 1 document
+- expose retrieved documents for inspection
+
+Endpoint:
+
+- POST /answer
+
+Supported retrievers:
+
+- bm25
+- dense
+- hybrid
+
+Example request:
+
+    {
+      "question": "I changed my login credentials and now transfers are blocked.",
+      "top_k": 5,
+      "retriever": "hybrid",
+      "alpha": 0.3
+    }
+
+Key behavior:
+
+The generator uses multiple retrieved documents instead of blindly trusting rank 1.
+
+For the paraphrased query:
+
+    I changed my login credentials and now transfers are blocked.
+
+Hybrid retrieval returned:
+
+- deposit_not_credited
+- password_reset
+- account_security
+- withdrawal_delay
+- network_selection
+
+The answer included Password Reset as a cited support document, which is important because the query is semantically related to password reset and temporary withdrawal restrictions.
+
+Test result:
+
+- 16 tests collected
+- 16 tests passed
+- 1 FastAPI / Starlette deprecation warning
+
+Current limitation:
+
+The answer generator is deterministic and extractive. It does not use an external LLM yet.
+
+Next step:
+
+Add unsupported-question handling and answer-quality evaluation before introducing LLM-based generation.
