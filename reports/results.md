@@ -724,3 +724,37 @@ Current pytest result:
 - 7 tests passed
 - runtime: 14.81s
 
+
+---
+
+## 15. v2.1: Retriever Selection API
+
+The `/query` endpoint now supports retriever selection.
+
+Supported retrievers:
+
+- bm25
+- dense
+- hybrid
+
+Example request:
+
+    {
+      "question": "I changed my login credentials and now transfers are blocked.",
+      "top_k": 5,
+      "retriever": "hybrid",
+      "alpha": 0.3
+    }
+
+The API demonstrates the same behavior observed in offline evaluation:
+
+- BM25 fails to retrieve password_reset for the paraphrased query.
+- Dense retrieves password_reset at rank 2.
+- Hybrid alpha=0.3 retrieves password_reset at rank 2.
+
+Current API test result:
+
+- tests collected: 11
+- tests passed: 11
+- warning: 1 Starlette/httpx deprecation warning
+

@@ -6,16 +6,18 @@ from pydantic import BaseModel, Field
 from app.retriever import SupportRetriever
 from app.dense_retriever import DenseRetriever
 from app.hybrid_retriever import HybridRetriever
+from app.generator import GroundedAnswerGenerator
 
 
 app = FastAPI(title="support-rag-agent")
 
 
 # Initialize retrievers once at startup.
-# Dense and Hybrid load sentence-transformer models, so this may take a few seconds.
 bm25_retriever = SupportRetriever()
 dense_retriever = DenseRetriever()
 hybrid_retrievers = {}
+
+answer_generator = GroundedAnswerGenerator()
 
 
 class QueryRequest(BaseModel):
@@ -52,12 +54,52 @@ class QueryResponse(BaseModel):
     citations: List[str]
 
 
+class AnswerRequest(BaseModel):
+    question: str
+    top_k: int = Field(default=5, ge=1, le=20)
+    retriever: Literal["bm25", "dense", "hybrid"] = "hybrid"
+    alpha: Optional[float] = Field(default=0.3, ge=0.0, le=1.0)
+
+
+class AnswerResponse(BaseModel):
+    question: str
+    answer: str
+    retriever: str
+    top_k: int
+    alpha: Optional[float] = None
+    citations: List[str]
+    is_supported: bool
+    retrieved_docs: List[RetrievedDocument]
+
+
 def get_hybrid_retriever(alpha: float) -> HybridRetriever:
-    # Cache by alpha so repeated calls do not reload the dense model.
     key = round(alpha, 4)
     if key not in hybrid_retrievers:
         hybrid_retrievers[key] = HybridRetriever(alpha=key)
     return hybrid_retrievers[key]
+
+
+def retrieve_docs(
+    question: str,
+    top_k: int,
+    retriever_name: Literal["bm25", "dense", "hybrid"],
+    alpha: Optional[float],
+):
+    if retriever_name == "bm25":
+        docs = bm25_retriever.retrieve(question, top_k=top_k)
+        response_alpha = None
+
+    elif retriever_name == "dense":
+        docs = dense_retriever.retrieve(question, top_k=top_k)
+        response_alpha = None
+
+    else:
+        hybrid_alpha = 0.3 if alpha is None else alpha
+        retriever = get_hybrid_retriever(hybrid_alpha)
+        docs = retriever.retrieve(question, top_k=top_k)
+        response_alpha = hybrid_alpha
+
+    return docs, response_alpha
 
 
 @app.get("/health")
@@ -67,19 +109,12 @@ def health():
 
 @app.post("/query", response_model=QueryResponse)
 def query(req: QueryRequest):
-    if req.retriever == "bm25":
-        docs = bm25_retriever.retrieve(req.question, top_k=req.top_k)
-        response_alpha = None
-
-    elif req.retriever == "dense":
-        docs = dense_retriever.retrieve(req.question, top_k=req.top_k)
-        response_alpha = None
-
-    else:
-        alpha = 0.3 if req.alpha is None else req.alpha
-        retriever = get_hybrid_retriever(alpha)
-        docs = retriever.retrieve(req.question, top_k=req.top_k)
-        response_alpha = alpha
+    docs, response_alpha = retrieve_docs(
+        question=req.question,
+        top_k=req.top_k,
+        retriever_name=req.retriever,
+        alpha=req.alpha,
+    )
 
     return QueryResponse(
         question=req.question,
@@ -88,4 +123,30 @@ def query(req: QueryRequest):
         alpha=response_alpha,
         retrieved_docs=docs,
         citations=[doc["doc_id"] for doc in docs],
+    )
+
+
+@app.post("/answer", response_model=AnswerResponse)
+def answer(req: AnswerRequest):
+    docs, response_alpha = retrieve_docs(
+        question=req.question,
+        top_k=req.top_k,
+        retriever_name=req.retriever,
+        alpha=req.alpha,
+    )
+
+    generated = answer_generator.generate(
+        question=req.question,
+        retrieved_docs=docs,
+    )
+
+    return AnswerResponse(
+        question=req.question,
+        answer=generated["answer"],
+        retriever=req.retriever,
+        top_k=req.top_k,
+        alpha=response_alpha,
+        citations=generated["citations"],
+        is_supported=generated["is_supported"],
+        retrieved_docs=docs,
     )
