@@ -471,3 +471,146 @@ Current tests:
 Next milestone:
 
 Implement a paraphrase-heavy evaluation set and compare BM25 v0.2 against Dense Retrieval again.
+
+---
+
+## 13. v1.1: Paraphrase-heavy Evaluation
+
+### Purpose
+
+The original evaluation set was too keyword-heavy.
+
+Both BM25 v0.2 and Dense Retrieval achieved perfect scores on the original 5-question evaluation set, so it was difficult to understand when dense retrieval becomes useful.
+
+To stress-test semantic matching, a paraphrase-heavy evaluation set was added.
+
+Evaluation file:
+
+- data/eval_questions_paraphrase.jsonl
+
+This set includes queries where the user wording differs from the document wording.
+
+Examples:
+
+- The money I transferred is missing from my account.
+- My payout is still pending after several hours.
+- Can my program place trades automatically using my account?
+- I cannot access my one-time password device anymore.
+- I changed my login credentials and now transfers are blocked.
+
+### Result
+
+| Method | Recall@5 | MRR | Avg Latency |
+|---|---:|---:|---:|
+| BM25 v0.2 | 0.9000 | 0.6500 | 0.15 ms |
+| Dense Retrieval | 1.0000 | 0.8333 | 16.67 ms |
+
+### Interpretation
+
+Dense Retrieval outperformed BM25 on the paraphrase-heavy evaluation set.
+
+BM25 remained much faster, but its ranking quality dropped significantly:
+
+- BM25 Recall@5 dropped from 1.0000 to 0.9000
+- BM25 MRR dropped from 1.0000 to 0.6500
+- Dense Retrieval kept Recall@5 at 1.0000
+- Dense Retrieval achieved higher MRR than BM25 on paraphrase-heavy queries
+
+This confirms the expected tradeoff:
+
+- BM25 is strong for keyword-heavy support search.
+- Dense Retrieval is stronger when user queries use semantically similar but lexically different wording.
+- Dense Retrieval is much slower without indexing or caching optimization.
+
+### BM25 Failure Case
+
+Query:
+
+- I changed my login credentials and now transfers are blocked.
+
+Gold document:
+
+- password_reset
+
+BM25 retrieved:
+
+- account_security
+- deposit_not_credited
+- withdrawal_delay
+- api_key_permission
+- kyc_verification
+
+Hit:
+
+- False
+
+Analysis:
+
+BM25 failed because the query used different wording from the document.
+
+The gold document describes password reset and temporary withdrawal restrictions, but the query used:
+
+- changed my login credentials
+- transfers are blocked
+
+These phrases are semantically related to password reset and withdrawal restriction, but they do not overlap enough lexically.
+
+### Dense Retrieval Behavior
+
+Dense Retrieval retrieved the correct gold document in the top 5:
+
+- deposit_not_credited
+- password_reset
+- withdrawal_delay
+- network_selection
+- account_security
+
+Hit:
+
+- True
+
+The gold document was ranked at position 2.
+
+This shows that dense embeddings captured semantic similarity better than BM25 for this paraphrased query.
+
+### Key Finding
+
+The value of dense retrieval does not appear on simple keyword-based support questions.
+
+It appears when:
+
+- the user describes the issue indirectly
+- the query uses synonyms or paraphrases
+- the document and query have weak lexical overlap
+- semantic similarity matters more than exact keyword overlap
+
+### Current Tradeoff
+
+| Retriever | Strength | Weakness |
+|---|---|---|
+| BM25 v0.2 | Very fast and strong on keyword queries | Sensitive to wording mismatch |
+| Dense Retrieval | Better on paraphrase-heavy queries | Much slower without indexing/caching |
+
+### Next Step
+
+The next milestone is Hybrid Retrieval.
+
+Hybrid retrieval should combine the strengths of both methods:
+
+- BM25 for fast lexical precision
+- Dense Retrieval for semantic robustness
+
+Possible scoring formula:
+
+    hybrid_score = alpha * bm25_score + (1 - alpha) * dense_score
+
+The next experiment should evaluate:
+
+- BM25 only
+- Dense only
+- Hybrid Retrieval
+
+on both:
+
+- original evaluation set
+- paraphrase-heavy evaluation set

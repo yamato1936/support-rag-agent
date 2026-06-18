@@ -1,3 +1,4 @@
+import argparse
 import json
 import time
 from pathlib import Path
@@ -16,8 +17,13 @@ def load_jsonl(path: str) -> List[Dict]:
     return rows
 
 
-def evaluate_retriever(name: str, retriever, top_k: int = 5) -> Tuple[float, float, float]:
-    questions = load_jsonl("data/eval_questions.jsonl")
+def evaluate_retriever(
+    name: str,
+    retriever,
+    eval_path: str,
+    top_k: int = 5,
+) -> Tuple[float, float, float]:
+    questions = load_jsonl(eval_path)
 
     hits = 0
     reciprocal_ranks = []
@@ -25,6 +31,7 @@ def evaluate_retriever(name: str, retriever, top_k: int = 5) -> Tuple[float, flo
 
     print("=" * 80)
     print(f"Evaluating: {name}")
+    print(f"Eval file: {eval_path}")
     print("=" * 80)
 
     for row in questions:
@@ -69,17 +76,42 @@ def evaluate_retriever(name: str, retriever, top_k: int = 5) -> Tuple[float, flo
 
 
 def main():
-    top_k = 5
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--eval-path",
+        default="data/eval_questions.jsonl",
+        help="Path to evaluation questions JSONL file.",
+    )
+    parser.add_argument(
+        "--top-k",
+        type=int,
+        default=5,
+        help="Number of retrieved documents.",
+    )
+    args = parser.parse_args()
 
     bm25 = SupportRetriever()
     dense = DenseRetriever()
 
-    bm25_metrics = evaluate_retriever("BM25 v0.2", bm25, top_k=top_k)
-    dense_metrics = evaluate_retriever("Dense Retrieval", dense, top_k=top_k)
+    bm25_metrics = evaluate_retriever(
+        "BM25 v0.2",
+        bm25,
+        eval_path=args.eval_path,
+        top_k=args.top_k,
+    )
+    dense_metrics = evaluate_retriever(
+        "Dense Retrieval",
+        dense,
+        eval_path=args.eval_path,
+        top_k=args.top_k,
+    )
 
     print("=" * 80)
     print("SUMMARY")
     print("=" * 80)
+    print(f"Eval file: {args.eval_path}")
+    print(f"Top-k: {args.top_k}")
+    print()
     print("| Method | Recall@5 | MRR | Avg Latency |")
     print("|---|---:|---:|---:|")
     print(

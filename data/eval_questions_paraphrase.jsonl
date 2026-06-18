@@ -1,0 +1,10 @@
+{"question":"The money I transferred is missing from my account.","gold_doc_ids":["deposit_not_credited"]}
+{"question":"My payout is still pending after several hours.","gold_doc_ids":["withdrawal_delay"]}
+{"question":"Can my program place trades automatically using my account?","gold_doc_ids":["api_key_permission"]}
+{"question":"I cannot access my one-time password device anymore.","gold_doc_ids":["two_factor_auth"]}
+{"question":"My buy order stayed open and never matched.","gold_doc_ids":["order_not_filled"]}
+{"question":"What should I do to prove my identity?","gold_doc_ids":["kyc_verification"]}
+{"question":"How are periodic payments between long and short traders calculated?","gold_doc_ids":["funding_fee"]}
+{"question":"Which chain should I choose when sending tokens?","gold_doc_ids":["network_selection"]}
+{"question":"Someone may have accessed my account. How can I protect it?","gold_doc_ids":["account_security"]}
+{"question":"I changed my login credentials and now transfers are blocked.","gold_doc_ids":["password_reset"]}
