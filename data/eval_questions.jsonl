@@ -1,0 +1,5 @@
+{"question":"My USDT deposit has not arrived. What should I check?","gold_doc_ids":["deposit_not_credited","network_selection"]}
+{"question":"Why is my withdrawal taking a long time?","gold_doc_ids":["withdrawal_delay"]}
+{"question":"What permissions can an API key have?","gold_doc_ids":["api_key_permission"]}
+{"question":"Why was my limit order not executed?","gold_doc_ids":["order_not_filled"]}
+{"question":"I lost access to my authenticator app. What should I do?","gold_doc_ids":["two_factor_auth"]}
