@@ -4,3 +4,4 @@ pydantic
 pytest
 sentence-transformers
 numpy
+httpx
