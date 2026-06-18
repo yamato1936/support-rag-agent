@@ -6,6 +6,7 @@ from typing import Dict, List, Tuple
 
 from app.retriever import SupportRetriever
 from app.dense_retriever import DenseRetriever
+from app.hybrid_retriever import HybridRetriever
 
 
 def load_jsonl(path: str) -> List[Dict]:
@@ -88,10 +89,17 @@ def main():
         default=5,
         help="Number of retrieved documents.",
     )
+    parser.add_argument(
+        "--alpha",
+        type=float,
+        default=0.5,
+        help="Hybrid weight for BM25. alpha=1.0 means BM25 only; alpha=0.0 means dense only.",
+    )
     args = parser.parse_args()
 
     bm25 = SupportRetriever()
     dense = DenseRetriever()
+    hybrid = HybridRetriever(alpha=args.alpha)
 
     bm25_metrics = evaluate_retriever(
         "BM25 v0.2",
@@ -105,12 +113,19 @@ def main():
         eval_path=args.eval_path,
         top_k=args.top_k,
     )
+    hybrid_metrics = evaluate_retriever(
+        f"Hybrid Retrieval alpha={args.alpha}",
+        hybrid,
+        eval_path=args.eval_path,
+        top_k=args.top_k,
+    )
 
     print("=" * 80)
     print("SUMMARY")
     print("=" * 80)
     print(f"Eval file: {args.eval_path}")
     print(f"Top-k: {args.top_k}")
+    print(f"Hybrid alpha: {args.alpha}")
     print()
     print("| Method | Recall@5 | MRR | Avg Latency |")
     print("|---|---:|---:|---:|")
@@ -119,6 +134,9 @@ def main():
     )
     print(
         f"| Dense Retrieval | {dense_metrics[0]:.4f} | {dense_metrics[1]:.4f} | {dense_metrics[2]:.2f} ms |"
+    )
+    print(
+        f"| Hybrid Retrieval alpha={args.alpha} | {hybrid_metrics[0]:.4f} | {hybrid_metrics[1]:.4f} | {hybrid_metrics[2]:.2f} ms |"
     )
 
 

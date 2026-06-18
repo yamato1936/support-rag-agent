@@ -614,3 +614,113 @@ on both:
 
 - original evaluation set
 - paraphrase-heavy evaluation set
+
+---
+
+## 14. v2: Hybrid Retrieval
+
+Purpose:
+
+The previous experiment showed a clear tradeoff:
+
+- BM25 is very fast but weaker on paraphrase-heavy queries.
+- Dense Retrieval is more robust to paraphrases but much slower.
+
+Hybrid Retrieval was added to combine lexical precision from BM25 and semantic robustness from dense retrieval.
+
+Hybrid score:
+
+    hybrid_score = alpha * normalized_bm25_score + (1 - alpha) * normalized_dense_score
+
+Score normalization:
+
+BM25 scores and dense cosine scores are on different scales, so both are min-max normalized per query before interpolation.
+
+Alpha meaning:
+
+- alpha = 1.0 means BM25-only behavior
+- alpha = 0.0 means Dense-only behavior
+- alpha = 0.3 is Dense-heavy Hybrid
+- alpha = 0.5 is balanced Hybrid
+- alpha = 0.7 is BM25-heavy Hybrid
+
+### Original Evaluation Set
+
+| Method | Recall@5 | MRR | Avg Latency |
+|---|---:|---:|---:|
+| BM25 v0.2 | 1.0000 | 1.0000 | 0.18 ms |
+| Dense Retrieval | 1.0000 | 1.0000 | 17.89 ms |
+| Hybrid alpha=0.5 | 1.0000 | 1.0000 | 17.56 ms |
+
+Interpretation:
+
+On the original keyword-heavy evaluation set, all methods achieved perfect Recall@5 and MRR.
+
+BM25 remains the best practical choice for this setting because it is much faster.
+
+### Paraphrase-heavy Evaluation Set
+
+| Method | Recall@5 | MRR | Avg Latency |
+|---|---:|---:|---:|
+| BM25 v0.2 | 0.9000 | 0.6500 | 0.12-0.20 ms |
+| Dense Retrieval | 1.0000 | 0.8333 | 16.15-22.56 ms |
+| Hybrid alpha=0.3 | 1.0000 | 0.8500 | 18.40 ms |
+| Hybrid alpha=0.5 | 1.0000 | 0.6833 | 17.37 ms |
+| Hybrid alpha=0.7 | 1.0000 | 0.7167 | 15.79 ms |
+
+### Best Method
+
+The best method on the paraphrase-heavy evaluation set was:
+
+- Hybrid Retrieval alpha=0.3
+- Recall@5: 1.0000
+- MRR: 0.8500
+- Avg Latency: 18.40 ms
+
+This slightly outperformed Dense Retrieval in MRR:
+
+- Dense Retrieval MRR: 0.8333
+- Hybrid alpha=0.3 MRR: 0.8500
+
+### Interpretation
+
+The result shows that Hybrid Retrieval is useful only when the weighting is chosen carefully.
+
+A Dense-heavy Hybrid worked best on paraphrase-heavy queries.
+
+However, increasing the BM25 weight hurt ranking quality:
+
+- alpha=0.5 MRR: 0.6833
+- alpha=0.7 MRR: 0.7167
+
+This means that BM25 scores introduced lexical bias that pushed some semantically correct documents lower in the ranking.
+
+### Key Finding
+
+Hybrid Retrieval is not automatically better than BM25 or Dense Retrieval.
+
+The alpha value must be evaluated empirically.
+
+For this small paraphrase-heavy dataset:
+
+- BM25 is fastest but misses one paraphrased case.
+- Dense is strong but slower.
+- Dense-heavy Hybrid alpha=0.3 gives the best MRR.
+- BM25-heavy Hybrid is worse than Dense.
+
+### Current Limitation
+
+The current Hybrid implementation runs dense encoding at query time, so its latency is close to Dense Retrieval.
+
+Future optimization should cache query-independent computations and use a vector index such as FAISS for larger document sets.
+
+### Test Result
+
+Hybrid tests were added.
+
+Current pytest result:
+
+- 7 tests collected
+- 7 tests passed
+- runtime: 14.81s
+
