@@ -823,3 +823,112 @@ The answer generator is deterministic and extractive. It does not use an externa
 Next step:
 
 Add unsupported-question handling and answer-quality evaluation before introducing LLM-based generation.
+
+## 17. v4: Unsupported-Question Refusal Guard
+
+### Purpose
+
+The previous `/answer` endpoint generated an answer whenever retrieved documents existed.
+
+However, retrieval does not imply answerability.
+
+A retriever always returns the nearest documents, even when the user asks an unsupported or out-of-domain question. This can cause a RAG system to answer using irrelevant support documents.
+
+The goal of this step was to add deterministic refusal behavior before answer generation.
+
+### Implementation
+
+A support-domain guard was added before grounded answer generation.
+
+The generator now checks:
+
+* whether retrieved documents exist
+* whether retrieved documents pass the minimum relevance filter
+* whether the question contains support-domain intent
+* whether the question contains obvious out-of-domain intent
+* whether the question has sufficient lexical overlap with retrieved support documents
+
+If the question is unsupported, the generator returns:
+
+```json
+{
+  "is_supported": false,
+  "citations": [],
+  "reason": "Question is outside the support-document domain."
+}
+```
+
+No grounded answer is generated for unsupported questions.
+
+### Example
+
+Unsupported question:
+
+```text
+Who is the CEO of Apple?
+```
+
+Even if the retriever returns a support document such as `deposit_not_credited`, the generator refuses to answer because the question is outside the support-document domain.
+
+### Validation
+
+Pytest result:
+
+```text
+17 passed, 1 warning
+```
+
+Tests were added or updated for:
+
+* supported answer generation
+* multi-document citation answers
+* maximum answer document limit
+* refusal when no documents are retrieved
+* refusal for out-of-domain questions even when retrieved documents exist
+
+### Interpretation
+
+This fixes a common RAG failure mode:
+
+```text
+retrieved documents exist
+→ therefore answer the question
+```
+
+This assumption is unsafe.
+
+The correct behavior is:
+
+```text
+retrieved documents exist
+→ check whether the question is answerable from support docs
+→ answer only if supported
+→ otherwise refuse
+```
+
+The refusal guard makes answerability explicit and prevents the system from generating unsupported answers from irrelevant retrieved context.
+
+### Current Limitation
+
+The refusal guard is deterministic and rule-based.
+
+It is useful as a transparent baseline, but it may still produce false positives or false negatives.
+
+Examples of future improvements:
+
+* build an unsupported-question evaluation set
+* measure refusal precision and recall
+* add answer-level evaluation
+* compare rule-based refusal against an LLM judge
+* test borderline support questions
+
+### Next Step
+
+The next milestone is answer evaluation.
+
+The project should evaluate:
+
+* whether the answer is grounded in retrieved documents
+* whether citations match the answer
+* whether unsupported questions are refused
+* whether answer generation over-trusts irrelevant retrieved documents
