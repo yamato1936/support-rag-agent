@@ -932,3 +932,265 @@ The project should evaluate:
 * whether citations match the answer
 * whether unsupported questions are refused
 * whether answer generation over-trusts irrelevant retrieved documents
+
+## 18. v5: Answer Endpoint Evaluation
+
+### Purpose
+
+The previous versions evaluated retrieval quality and added a grounded `/answer` endpoint with unsupported-question refusal.
+
+However, retrieval metrics alone do not evaluate whether the final answer endpoint behaves correctly.
+
+The goal of v5 was to evaluate the `/answer` endpoint directly.
+
+The evaluation focuses on:
+
+* whether the system answers supported questions
+* whether the system refuses unsupported questions
+* whether cited documents include the expected gold documents
+* whether unsupported questions return no citations
+* whether the system over-cites irrelevant documents
+
+### Evaluation Data
+
+A new answer evaluation set was added:
+
+* `data/eval_answer_questions.jsonl`
+
+The dataset contains:
+
+| Type                                | Count |
+| ----------------------------------- | ----: |
+| Supported support questions         |     6 |
+| Unsupported out-of-domain questions |     4 |
+| Total                               |    10 |
+
+Supported examples:
+
+* My USDT deposit has not arrived. What should I check?
+* Why is my withdrawal taking a long time?
+* I changed my login credentials and now transfers are blocked.
+
+Unsupported examples:
+
+* What is the weather tomorrow?
+* Who is the CEO of Apple?
+* What is the current Bitcoin price?
+* Can you recommend a movie to watch tonight?
+
+### Evaluation Script
+
+A new script was added:
+
+* `eval/evaluate_answers.py`
+
+Example command:
+
+```bash
+python -m eval.evaluate_answers --retriever hybrid --alpha 0.3 --top-k 5
+```
+
+The script calls the `/answer` endpoint through FastAPI `TestClient` and computes endpoint-level metrics.
+
+### Metrics
+
+Answerability accuracy:
+
+```text
+answerability_accuracy = number of correct supported/unsupported decisions / total questions
+```
+
+Supported citation recall:
+
+```text
+citation_recall = number of gold citations included / number of gold citations
+```
+
+Supported citation precision:
+
+```text
+citation_precision = number of gold citations included / number of produced citations
+```
+
+Supported citation F1:
+
+```text
+citation_f1 = 2 * precision * recall / (precision + recall)
+```
+
+Unsupported refusal accuracy:
+
+```text
+unsupported_refusal_accuracy = correctly refused unsupported questions / unsupported questions
+```
+
+Unsupported citation violations:
+
+```text
+unsupported_citation_violations = number of unsupported answers that still returned citations
+```
+
+### v5 Result
+
+Using Hybrid Retrieval with alpha=0.3:
+
+| Metric                          |  Value |
+| ------------------------------- | -----: |
+| Answerability accuracy          | 1.0000 |
+| Supported citation recall       | 1.0000 |
+| Supported citation precision    | 0.4444 |
+| Supported citation F1           | 0.6000 |
+| Unsupported refusal accuracy    | 1.0000 |
+| Unsupported citation violations |      0 |
+
+### Interpretation
+
+The v5 evaluation showed that the answer endpoint made correct answerability decisions.
+
+The system correctly answered supported questions and refused unsupported questions.
+
+Most importantly, unsupported questions produced no citations:
+
+```text
+unsupported_citation_violations = 0
+```
+
+This confirms that the refusal guard prevents the system from producing citation-grounded answers for out-of-domain questions.
+
+However, v5 also exposed a new failure mode:
+
+```text
+citation recall was high, but citation precision was low
+```
+
+The generator included the correct gold documents, but it also included extra irrelevant citations.
+
+This is an over-citation problem.
+
+### Key Finding
+
+Citation recall alone is not enough.
+
+A RAG system can include the correct source document while still citing irrelevant documents.
+
+Therefore, answer evaluation should measure both:
+
+* citation recall
+* citation precision
+
+---
+
+## 19. v5.1: Reduce Over-Citation
+
+### Purpose
+
+v5 revealed that the grounded answer generator was over-citing.
+
+The previous generator default used up to three answer documents:
+
+```python
+max_answer_docs = 3
+```
+
+This improved citation recall, but reduced citation precision because the answer often included extra documents.
+
+The goal of v5.1 was to reduce over-citation while preserving answerability and unsupported-question refusal.
+
+### Change
+
+The default number of answer documents was reduced:
+
+```python
+max_answer_docs = 3
+```
+
+to:
+
+```python
+max_answer_docs = 2
+```
+
+This is a simple deterministic baseline for citation pruning.
+
+### Result
+
+Hybrid Retrieval with alpha=0.3:
+
+| Version | Citation Recall | Citation Precision | Citation F1 |
+| ------- | --------------: | -----------------: | ----------: |
+| v5.0    |          1.0000 |             0.4444 |      0.6000 |
+| v5.1    |          0.9167 |             0.5833 |      0.6944 |
+
+Other endpoint-level metrics remained stable:
+
+| Metric                          |  Value |
+| ------------------------------- | -----: |
+| Answerability accuracy          | 1.0000 |
+| Unsupported refusal accuracy    | 1.0000 |
+| Unsupported citation violations |      0 |
+
+Pytest result:
+
+```text
+17 passed, 1 warning
+```
+
+### Interpretation
+
+v5.1 improved citation precision and citation F1.
+
+The tradeoff was a small drop in citation recall:
+
+```text
+1.0000 -> 0.9167
+```
+
+This is acceptable because the goal of v5.1 was not to maximize recall alone.
+
+The goal was to reduce unnecessary citations and improve overall citation quality.
+
+The result shows the expected tradeoff:
+
+```text
+fewer cited documents
+→ fewer irrelevant citations
+→ higher precision
+→ higher F1
+→ slightly lower recall
+```
+
+### Key Finding
+
+Grounded answer generation needs citation selection, not just retrieval.
+
+Even if the retriever returns useful documents, the generator should not blindly cite every high-ranked document.
+
+A smaller citation set can improve answer quality when measured with precision and F1.
+
+### Current Limitation
+
+The v5.1 pruning rule is simple.
+
+It only limits the number of cited answer documents.
+
+Future improvements should test:
+
+* score-threshold pruning
+* top-score ratio filtering
+* citation reranking
+* sentence-level citation selection
+* answer-document selection evaluated separately from retrieval
+
+### Next Step
+
+The implementation phase can now be considered complete for the first public version.
+
+The next step is to update the README so that the public repository clearly communicates:
+
+* BM25, Dense, and Hybrid retrieval
+* paraphrase-heavy evaluation
+* grounded `/answer` endpoint
+* unsupported-question refusal
+* answer endpoint evaluation
+* over-citation analysis and improvement
+
