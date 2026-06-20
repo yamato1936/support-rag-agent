@@ -1,4 +1,5 @@
 from typing import Dict, List
+from app.support_guard import assess_support
 
 
 class GroundedAnswerGenerator:
@@ -11,6 +12,7 @@ class GroundedAnswerGenerator:
     Design goal:
     - avoid hallucination
     - avoid over-trusting rank 1
+    - refuse unsupported / out-of-domain questions
     - expose citations clearly
     - prepare for later LLM-based generation
     """
@@ -36,6 +38,11 @@ class GroundedAnswerGenerator:
                 "I found some documents, but none were relevant enough to answer safely."
             )
 
+        support_decision = assess_support(question, useful_docs)
+
+        if not support_decision.is_supported:
+            return self._unsupported_response(support_decision.reason)
+
         answer_docs = useful_docs[: self.max_answer_docs]
         citations = [doc["doc_id"] for doc in answer_docs]
 
@@ -45,15 +52,18 @@ class GroundedAnswerGenerator:
             "answer": answer,
             "citations": citations,
             "is_supported": True,
+            "reason": "Answered using retrieved support documents.",
         }
 
     def _unsupported_response(self, reason: str) -> Dict:
         return {
             "answer": (
-                f"{reason} Please rephrase the question or contact support."
+                f"{reason} I do not have enough information in the support "
+                "documents to answer this question safely."
             ),
             "citations": [],
             "is_supported": False,
+            "reason": reason,
         }
 
     def _filter_useful_docs(self, retrieved_docs: List[Dict]) -> List[Dict]:

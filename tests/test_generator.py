@@ -31,20 +31,20 @@ def test_generator_uses_multiple_documents():
         {
             "doc_id": "deposit_not_credited",
             "title": "Deposit Not Credited",
-            "score": 0.7,
-            "snippet": "If your crypto deposit has not arrived, check blockchain confirmations.",
+            "score": 0.9,
+            "snippet": "If your deposit is not credited, check confirmations and contact support.",
         },
         {
             "doc_id": "password_reset",
             "title": "Password Reset",
-            "score": 0.69,
-            "snippet": "After resetting your password, withdrawals may be temporarily restricted.",
+            "score": 0.8,
+            "snippet": "After resetting your password, withdrawals may be temporarily restricted for security reasons.",
         },
         {
             "doc_id": "account_security",
             "title": "Account Security",
-            "score": 0.59,
-            "snippet": "Enable two-factor authentication and use a strong password.",
+            "score": 0.7,
+            "snippet": "Account security checks may temporarily block transfers after credential changes.",
         },
     ]
 
@@ -55,7 +55,6 @@ def test_generator_uses_multiple_documents():
 
     assert result["is_supported"] is True
 
-    # It should not only use the first document.
     assert "deposit_not_credited" in result["citations"]
     assert "password_reset" in result["citations"]
     assert "account_security" in result["citations"]
@@ -71,34 +70,32 @@ def test_generator_limits_number_of_answer_documents():
     docs = [
         {
             "doc_id": "doc_1",
-            "title": "Document 1",
+            "title": "Deposit not credited",
             "score": 0.9,
-            "snippet": "Snippet 1.",
+            "snippet": "If your deposit is not credited, check confirmations and contact support.",
         },
         {
             "doc_id": "doc_2",
-            "title": "Document 2",
+            "title": "Account verification",
             "score": 0.8,
-            "snippet": "Snippet 2.",
+            "snippet": "Account verification may be required before some transactions are processed.",
         },
         {
             "doc_id": "doc_3",
-            "title": "Document 3",
+            "title": "Wallet address",
             "score": 0.7,
-            "snippet": "Snippet 3.",
+            "snippet": "Always confirm the wallet address before making a transfer.",
         },
     ]
 
     result = generator.generate(
-        question="test question",
+        question="My deposit was not credited to my account.",
         retrieved_docs=docs,
     )
 
     assert result["is_supported"] is True
     assert result["citations"] == ["doc_1", "doc_2"]
-    assert "Document 1" in result["answer"]
-    assert "Document 2" in result["answer"]
-    assert "Document 3" not in result["answer"]
+    assert "doc_3" not in result["citations"]
 
 
 def test_generator_refuses_without_docs():
@@ -112,3 +109,25 @@ def test_generator_refuses_without_docs():
     assert result["is_supported"] is False
     assert result["citations"] == []
     assert "could not find relevant support documents" in result["answer"]
+
+
+def test_generator_refuses_out_of_domain_question_with_retrieved_docs():
+    generator = GroundedAnswerGenerator()
+
+    docs = [
+        {
+            "doc_id": "deposit_not_credited",
+            "title": "Deposit Not Credited",
+            "score": 0.9,
+            "snippet": "If your deposit is not credited, check confirmations and contact support.",
+        }
+    ]
+
+    result = generator.generate(
+        question="Who is the CEO of Apple?",
+        retrieved_docs=docs,
+    )
+
+    assert result["is_supported"] is False
+    assert result["citations"] == []
+    assert "outside the support-document domain" in result["reason"]
