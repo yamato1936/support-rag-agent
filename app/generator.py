@@ -20,7 +20,7 @@ class GroundedAnswerGenerator:
     def __init__(
         self,
         min_relevance_score: float = 0.0,
-        max_answer_docs: int = 3,
+        max_answer_docs: int = 2,
     ):
         self.min_relevance_score = min_relevance_score
         self.max_answer_docs = max_answer_docs
