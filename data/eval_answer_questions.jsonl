@@ -1,0 +1,10 @@
+{"question":"My USDT deposit has not arrived. What should I check?","expected_is_supported":true,"gold_doc_ids":["deposit_not_credited","network_selection"]}
+{"question":"Why is my withdrawal taking a long time?","expected_is_supported":true,"gold_doc_ids":["withdrawal_delay"]}
+{"question":"What permissions can an API key have?","expected_is_supported":true,"gold_doc_ids":["api_key_permission"]}
+{"question":"Why was my limit order not executed?","expected_is_supported":true,"gold_doc_ids":["order_not_filled"]}
+{"question":"I lost access to my authenticator app. What should I do?","expected_is_supported":true,"gold_doc_ids":["two_factor_auth"]}
+{"question":"I changed my login credentials and now transfers are blocked.","expected_is_supported":true,"gold_doc_ids":["password_reset","account_security"]}
+{"question":"What is the weather tomorrow?","expected_is_supported":false,"gold_doc_ids":[]}
+{"question":"Who is the CEO of Apple?","expected_is_supported":false,"gold_doc_ids":[]}
+{"question":"What is the current Bitcoin price?","expected_is_supported":false,"gold_doc_ids":[]}
+{"question":"Can you recommend a movie to watch tonight?","expected_is_supported":false,"gold_doc_ids":[]}
